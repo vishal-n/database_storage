@@ -5,91 +5,106 @@ import logging
 import doctest
 
 
-class KeyValueStore:
+class TransactionalStorage:
 
     def __init__(self):
-        self.store = {}
-        self.current_store = {}
-        self.is_transaction_in_progress = False
-        self.new_keys_added = []
-        self.previous_key_values = {}
-    
+        self.data = {}                  ### The main data storage
+        self.transaction_backup = None  ### Holds backup of the data, when a transaction begins
 
-    def set_key(self, new_key, new_val):
+
+    def set_key(self, key, val):
         """
-        To add a new key or set a new value to an existing key
-
-        >>> set_key("123", "BLR")
-
+        Creates a new key or updates an existing key with the given value.
         """
-        self.current_store = self.store
+        self.data[key] = val
+        print(f"Set key {val} to {val}")
 
-        if self.store.get(new_key):
-            curr_value = self.store[new_key]
-            self.store[new_key] = new_val
-            self.previous_key_values[new_key] = curr_value
-            print(f"*** The value for key {new_key} is replaced, with this new value {new_val} ***")
-        else:
-            self.store[new_key] = new_val
-            self.new_keys_added.append(new_key)
-            print(f"*** New key {new_key} is added, whose value is {new_val} ***s")
-    
 
-    def get_key(self, input_key):
+    def get_key(self, key):
         """
         To retrive the value of a key
         """
-        if self.store.get(input_key):
-            return self.store.get(input_key)
+        if self.data.get(key):
+            return self.data[key]
         else:
-            raise Exception(f"The given key: {input_key}, does not exist")
-    
-
-    def begin(self):
-        self.is_transaction_in_progress = True
-        print("Transaction started !!!")
-    
-
-    def commit(self):
-        print("Transaction complete !!!")
-        self.current_store = self.store
-        self.is_transaction_in_progress = False
+            print(f"The given key: {key}, does not exist")
+            return None
     
 
     def delete_key(self, key):
-        if key in self.store:
-            del self.store[key]
+        """ 
+        Deletes a key if it exists.
+        """
+        if key in self.data:
+            del self.data[key]
+            print(f"Key '{key}' deleted.")
+        else:
+            print(f"Key '{key}' not found.")
+
+
+    def begin(self):
+        """
+        Begins a transaction by saving a snapshot of the current state.
+        Only one transaction can be active at a time.
+        """
+        if self.transaction_backup is not None:
+            print("\n Transaction already in progress.")
+        else:
+            self.transaction_backup = self.data.copy()
+            print("\n Transaction started !!")
+
+
+    def commit(self):
+        """
+        Finalizes the transaction. 
+        Once committed, the changes cannot be rolled back.
+        """
+        if self.transaction_backup is None:
+            print("No transaction to commit.")
+        else:
+            self.transaction_backup = None
+            print("Transaction commit successful !!")
 
 
     def rollback(self):
-
-        self.store = self.current_store
-
-        # if self.new_keys_added:
-        #     for key in self.new_keys_added:
-        #         del self.store[key]
-        
-
-        # for key in self.store:
-        #     if key in self.previous_key_values:
-        #         self.store[key] = self.previous_key_values[keys]
-        
-        print("Rollback successful !!")
+        """
+        Reverts all changes made since the last 'begin'.
+        """
+        if self.transaction_backup is None:
+            print("No transaction to rollback.")
+        else:
+            # Revert data to the backup state
+            self.data = self.transaction_backup
+            self.transaction_backup = None
+            print("Transaction rollback successful !!")
         
 
 
 if __name__ == '__main__':
 
-    kvs_obj = KeyValueStore()
+    store = TransactionalStorage()
 
-    # kvs_obj.set_key("123", "XYZ")
-    kvs_obj.set_key("567", "MUM")
+    store.set_key("name", "Alice")
+    print("name = ", store.get_key("name"))
 
-    kvs_obj.begin()
-    kvs_obj.set_key("123", "BLR")
-    kvs_obj.set_key("12345", "DEL")
-    kvs_obj.delete_key("567")
-    kvs_obj.rollback()
-    # kvs_obj.commit()
+    # Start a transaction
+    store.begin()
+    store.set_key("name", "Bob")
+    store.set_key("age", 30)
+    print("name =", store.get_key("name"))
+    print("age =", store.get_key("age"))
+    store.rollback()
+    print("\n")
+    print("After rollback: \n")
+    print("name = ", store.get_key("name"))
+    print("age =", store.get_key("age"))
 
-    print("Current store: ", kvs_obj.store)
+
+    # Begin a new transaction and commit changes
+    store.begin()
+    store.set_key("name", "Charlie")
+    store.delete_key("name")
+    store.commit()
+    print("\n")
+    print("After commit: ")
+    print("name =", store.get_key("name"))
